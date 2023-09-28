@@ -51,9 +51,16 @@ public class Main {
 
         List<Integer> ids = List.of(3, 2545, 123, 4, 189, 89, 3458, 1189, 10, 102);
 
-        main.testRedisData(ids); //testing time
+        long startRedis = System.currentTimeMillis();
+        main.testRedisData(ids);
+        long stopRedis = System.currentTimeMillis();
 
-        main.testMysqlData(ids); //testing time
+        long startMysql = System.currentTimeMillis();
+        main.testMysqlData(ids);
+        long stopMysql = System.currentTimeMillis();
+
+        System.out.printf("%s:\t%d ms\n", "Redis", (stopRedis - startRedis));
+        System.out.printf("%s:\t%d ms\n", "MySQL", (stopMysql - startMysql));
 
 
         main.shutdown();
@@ -73,15 +80,14 @@ public class Main {
     private SessionFactory prepareRelationalDb() {
         final SessionFactory sessionFactory;
         Properties properties = new Properties();
+        properties.put(Environment.DIALECT, "org.hibernate.dialect.MySQL8Dialect");
         properties.put(Environment.DRIVER, "com.mysql.jdbc.Driver");
         properties.put(Environment.URL, "jdbc:mysql://localhost:3307/world");
-        properties.put(Environment.DIALECT, "org.hibernate.dialect.MySQL8Dialect");
         properties.put(Environment.USER, "root");
         properties.put(Environment.PASS, "root");
-        properties.put(Environment.HBM2DDL_AUTO, "validate");
         properties.put(Environment.CURRENT_SESSION_CONTEXT_CLASS, "thread");
+        properties.put(Environment.HBM2DDL_AUTO, "validate");
         properties.put(Environment.STATEMENT_BATCH_SIZE, "100");
-//        properties.put(Environment.SHOW_SQL, "true");
 
         sessionFactory = new Configuration()
                 .setProperties(properties)
@@ -163,7 +169,7 @@ public class Main {
         }).collect(Collectors.toList());
     }
 
-    // закрываем
+    // закрываем наши подключения к базам данных
     private void shutdown() {
         if (nonNull(sessionFactory)) {
             sessionFactory.close();
@@ -175,8 +181,6 @@ public class Main {
 
     // тестируем скорость получения N данных
     private void testRedisData(List<Integer> ids) {
-        long startRedis = System.currentTimeMillis();
-
         try (StatefulRedisConnection<String, String> connection = redisClient.connect()) {
             RedisStringCommands<String, String> sync = connection.sync();
             for (Integer id : ids) {
@@ -188,14 +192,10 @@ public class Main {
                 }
             }
         }
-        long stopRedis = System.currentTimeMillis();
-        System.out.printf("%s:\t%d ms\n", "Redis", (stopRedis - startRedis));
     }
 
     // тестируем скорость получения N данных
     private void testMysqlData(List<Integer> ids) {
-        long startMysql = System.currentTimeMillis();
-
         try (Session session = sessionFactory.getCurrentSession()) {
             session.beginTransaction();
             for (Integer id : ids) {
@@ -204,8 +204,5 @@ public class Main {
             }
             session.getTransaction().commit();
         }
-        long stopMysql = System.currentTimeMillis();
-
-        System.out.printf("%s:\t%d ms\n", "MySQL", (stopMysql - startMysql));
     }
 }
